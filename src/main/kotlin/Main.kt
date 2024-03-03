@@ -25,13 +25,12 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.encodeToJsonElement
 import model.*
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.*
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 val logger: Logger = LoggerFactory.getLogger("bot")
 val dotenv = Dotenv.load()
@@ -48,6 +47,7 @@ val twitchClientSecret = dotenv.get("TWITCH_CLIENT_SECRET").replace("'", "")
 val telegraphApikey = dotenv.get("TELEGRAPH_API_KEY").replace("'", "")
 val tgAdminid = dotenv.get("TG_ADMIN_ID").replace("'", "")
 val hpg4ApiUrl = dotenv.get("HPG4_API_JSON_URL").replace("'", "")
+val telegraphMapper = TelegraphMapper()
 var playersExt: Players = Players(listOf())
 var playersExtended: MutableList<PlayerExtended> = mutableListOf()
 var trophies: Trophies = Trophies(listOf())
@@ -58,7 +58,8 @@ var trophiesUrl = ""
 data class PlayerExtended(
     val player: Player,
     val telegraphUrl: String,
-    val inventoryUrl: String
+    val inventoryUrl: String,
+    val effectsUrl: String
 ) {}
 
 val twitchClient: TwitchClient = TwitchClientBuilder.builder()
@@ -75,7 +76,7 @@ val twitchClient: TwitchClient = TwitchClientBuilder.builder()
 val httpClient = HttpClient(CIO) {
     expectSuccess = true
     install(Logging) {
-        level = LogLevel.INFO
+        level = LogLevel.BODY
     }
     install(HttpTimeout)
     install(ContentNegotiation) {
@@ -88,13 +89,13 @@ val httpClient = HttpClient(CIO) {
 }
 
 
+@OptIn(DelicateCoroutinesApi::class)
 val tgBot = bot {
     token = tgBotToken
 //    logLevel = com.github.kotlintelegrambot.logging.LogLevel.All()
     dispatch {
         callbackQuery() {
             val chatId = callbackQuery.message?.chat?.id ?: return@callbackQuery
-            val messageId = callbackQuery.message?.messageId ?: return@callbackQuery
             logger.info("tg, callbackQuery, data: ${callbackQuery.data}")
             var nick = callbackQuery.data
             if (nick == "::trophies") {
@@ -109,7 +110,7 @@ val tgBot = bot {
                     listOf(
                         InlineKeyboardButton.Url(
                             text = "Эффекты",
-                            url = "${player.telegraphUrl}#Эффекты",
+                            url = player.effectsUrl,
                         ),
                         InlineKeyboardButton.Url(
                             text = "Характеристики",
@@ -139,15 +140,17 @@ val tgBot = bot {
                 )
                 val message = bot.sendMessage(
                     chatId = ChatId.fromId(chatId),
-                    text = getPlayerInfo(callbackQuery.data) + "\nСообщение автоудалится через 5 минут",
+                    text = getPlayerInfo(callbackQuery.data) + if (isPrivateMessage(callbackQuery.message!!)) "" else "\nСообщение автоудалится через 5 минут",
                     replyMarkup = markup,
                 )
-                GlobalScope.launch {
-                    delay(5 * 60000L)
-                    try {
-                        bot.deleteMessage(chatId = ChatId.fromId(chatId), message.get().messageId)
-                    } catch (e: Throwable) {
-                        logger.error("Failed delete callback message callbackQueru: ", e)
+                if (!isPrivateMessage(callbackQuery.message!!)) {
+                    GlobalScope.launch {
+                        delay(5 * 60000L)
+                        try {
+                            bot.deleteMessage(chatId = ChatId.fromId(chatId), message.get().messageId)
+                        } catch (e: Throwable) {
+                            logger.error("Failed delete callback message callbackQueru: ", e)
+                        }
                     }
                 }
             }
@@ -195,7 +198,7 @@ val tgBot = bot {
         command("hpg_info") {
             logger.info(
                 "tg, hpg_info, message: ${message.text} user: ${message.from?.firstName} ${message.from?.lastName ?: ""} ${message.from?.username ?: ""} ${message.from?.username ?: ""}" +
-                        " ${message.chat.firstName} ${message.chat.lastName ?: ""} ${message.chat.username ?: ""} ${message.chat.username ?: ""}"
+                        " ${message.chat.firstName} ${message.chat.lastName ?: ""} ${message.chat.username ?: ""} ${message.chat.username ?: ""}, chatId:  ${message.chat.id}"
             )
             GlobalScope.launch { tgHpgInfoCommand(message) }
         }
@@ -251,7 +254,7 @@ suspend fun fetchData() {
         trophies = Gson().fromJson(response, Trophies::class.java)
         playersExt = Gson().fromJson(response, Players::class.java)
         bases = Gson().fromJson(response, Bases::class.java)
-        val localLastUpdated = LocalDateTime.now().format(formatter) + " Мск"
+        val localLastUpdated = LocalDateTime.now().format(formatter) + " GMT+3"
         playersExt.players.forEachIndexed { index, player ->
             val telegraphUrl = httpClient.post("https://api.telegra.ph/editPage/HPG4-Player-${index + 1}-03-02") {
                 timeout {
@@ -260,7 +263,7 @@ suspend fun fetchData() {
                 contentType(ContentType.Application.Json)
                 setBody(
                     RootPage(
-                        mapPlayerToTelegraph(player, index, localLastUpdated),
+                        telegraphMapper.mapPlayerToTelegraph(player, index, bases, localLastUpdated),
                         telegraphApikey,
                         "Инфо ${player.name}",
                         returnContent = false
@@ -268,7 +271,6 @@ suspend fun fetchData() {
                 )
             }.body<Root>().result.url
             delay(1500L)
-
             val inventoryUrl = httpClient.post("https://api.telegra.ph/editPage/HPG4-Player-${index + 1}-inv-03-02") {
                 timeout {
                     requestTimeoutMillis = 60000
@@ -276,7 +278,7 @@ suspend fun fetchData() {
                 contentType(ContentType.Application.Json)
                 setBody(
                     RootPage(
-                        mapInventoryToTelegraph(player, localLastUpdated),
+                        telegraphMapper.mapInventoryToTelegraph(player, localLastUpdated),
                         telegraphApikey,
                         "Инвентарь ${player.name}",
                         returnContent = false
@@ -284,7 +286,22 @@ suspend fun fetchData() {
                 )
             }.body<Root>().result.url
             delay(1500L)
-            playersExtended.add(PlayerExtended(player, telegraphUrl, inventoryUrl))
+            val effectsUrl = httpClient.post("https://api.telegra.ph/editPage/HPG4-Player-${index + 1}-effects-03-03") {
+                timeout {
+                    requestTimeoutMillis = 60000
+                }
+                contentType(ContentType.Application.Json)
+                setBody(
+                    RootPage(
+                        telegraphMapper.mapEffectsToTelegraph(player, localLastUpdated),
+                        telegraphApikey,
+                        "Эффекты ${player.name}",
+                        returnContent = false
+                    )
+                )
+            }.body<Root>().result.url
+            delay(1500L)
+            playersExtended.add(PlayerExtended(player, telegraphUrl, inventoryUrl, effectsUrl))
         }
         delay(1500L)
         trophiesUrl = httpClient.post("https://api.telegra.ph/editPage/Trofei-03-02") {
@@ -294,7 +311,7 @@ suspend fun fetchData() {
             contentType(ContentType.Application.Json)
             setBody(
                 RootPage(
-                    mapTrophiesToTelegraph(localLastUpdated),
+                    telegraphMapper.mapTrophiesToTelegraph(trophies, localLastUpdated),
                     telegraphApikey,
                     "Трофеи",
                     returnContent = false
@@ -316,431 +333,7 @@ suspend fun fetchData() {
 
 }
 
-fun mapInventoryToTelegraph(player: Player, localLastUpdated: String): List<Content> {
-    val content: MutableList<Content> = mutableListOf()
-    //Inventory
-    content.add(
-        Content(
-            tag = "p",
-            children = Json.encodeToJsonElement(listOf("Обновлено: ${localLastUpdated}"))
-        )
-    )
-    content.add(
-        Content(
-            tag = "b",
-            children = Json.encodeToJsonElement(listOf("Кольца: \n")),
-        )
-    )
-    content.add(
-        Content(
-            tag = "p",
-            children = Json.encodeToJsonElement(listOf(player.inventory.slots.getListItem(player.inventory.slots.rings)))
-        )
-    )
-    content.add(
-        Content(
-            tag = "b",
-            children = Json.encodeToJsonElement(listOf("Карманы: \n")),
-        )
-    )
-    content.add(
-        Content(
-            tag = "p",
-            children = Json.encodeToJsonElement(listOf(player.inventory.slots.getListItem(player.inventory.slots.pockets)))
-        )
-    )
-    content.add(
-        Content(
-            tag = "b",
-            children = Json.encodeToJsonElement(listOf("Колёса: \n")),
-        )
-    )
-    content.add(
-        Content(
-            tag = "p",
-            children = Json.encodeToJsonElement(listOf(player.inventory.slots.getListItem(player.inventory.slots.wheels)))
-        )
-    )
-    content.add(
-        Content(
-            tag = "b",
-            children = Json.encodeToJsonElement(listOf("Инвентарь: \n")),
-        )
-    )
-    content.add(
-        Content(
-            tag = "p",
-            children = Json.encodeToJsonElement(listOf(player.inventory.slots.getListItem(player.inventory.slots.stock)))
-        )
-    )
-    content.add(
-        Content(
-            tag = "b",
-            children = Json.encodeToJsonElement(listOf("Перчатки: \n")),
-        )
-    )
-    /* for(item in player.inventory.slots.stock!!) {
-         println(item.toString())
-     }*/
-    content.add(
-        Content(
-            tag = "p",
-            children = Json.encodeToJsonElement(listOf(player.inventory.slots.getItem(player.inventory.slots.gloves)))
-        )
-    )
-    content.add(
-        Content(
-            tag = "b",
-            children = Json.encodeToJsonElement(listOf("Голова: \n")),
-        )
-    )
-    content.add(
-        Content(
-            tag = "p",
-            children = Json.encodeToJsonElement(listOf(player.inventory.slots.getItem(player.inventory.slots.head)))
-        )
-    )
-    content.add(
-        Content(
-            tag = "b",
-            children = Json.encodeToJsonElement(listOf("Тело: \n")),
-        )
-    )
-    content.add(
-        Content(
-            tag = "p",
-            children = Json.encodeToJsonElement(listOf(player.inventory.slots.getItem(player.inventory.slots.body)))
-        )
-    )
-    content.add(
-        Content(
-            tag = "b",
-            children = Json.encodeToJsonElement(listOf("Одежда: \n")),
-        )
-    )
-    content.add(
-        Content(
-            tag = "p",
-            children = Json.encodeToJsonElement(listOf(player.inventory.slots.getItem(player.inventory.slots.clothes)))
-        )
-    )
-    content.add(
-        Content(
-            tag = "b",
-            children = Json.encodeToJsonElement(listOf("Пояс: \n")),
-        )
-    )
-    content.add(
-        Content(
-            tag = "p",
-            children = Json.encodeToJsonElement(listOf(player.inventory.slots.getItem(player.inventory.slots.belt)))
-        )
-    )
-    content.add(
-        Content(
-            tag = "b",
-            children = Json.encodeToJsonElement(listOf("Обувь: \n")),
-        )
-    )
-    content.add(
-        Content(
-            tag = "p",
-            children = Json.encodeToJsonElement(listOf(player.inventory.slots.getItem(player.inventory.slots.shoes)))
-        )
-    )
-    content.add(
-        Content(
-            tag = "b",
-            children = Json.encodeToJsonElement(listOf("Цепь: \n")),
-        )
-    )
-    content.add(
-        Content(
-            tag = "p",
-            children = Json.encodeToJsonElement(listOf(player.inventory.slots.getItem(player.inventory.slots.chain)))
-        )
-    )
-    content.add(
-        Content(
-            tag = "b",
-            children = Json.encodeToJsonElement(listOf("Ноги: \n")),
-        )
-    )
-    content.add(
-        Content(
-            tag = "p",
-            children = Json.encodeToJsonElement(listOf(player.inventory.slots.getItem(player.inventory.slots.legs)))
-        )
-    )
-    return content
-}
-
-fun mapTrophiesToTelegraph(localLastUpdated: String): List<Content> {
-    val content: MutableList<Content> = mutableListOf()
-    //Trophies
-    content.add(
-        Content(
-            tag = "p",
-            children = Json.encodeToJsonElement(listOf("Обновлено: ${localLastUpdated}"))
-        )
-    )
-    for (trophie in trophies.trophies) {
-        content.add(
-            Content(
-                tag = "b",
-                children = Json.encodeToJsonElement(listOf(trophie.name + "\n")),
-            )
-        )
-        content.add(
-            Content(
-                tag = "p",
-                children = Json.encodeToJsonElement(listOf(trophie.toString()))
-            )
-        )
-        trophie.leaderboard.list.sortedByDescending { it.trophyScore.toIntOrNull() }.forEachIndexed { index, leader ->
-            content.add(
-                Content(
-                    tag = "p",
-                    children = Json.encodeToJsonElement(listOf("${index + 1}. ${leader.toString()}"))
-                )
-            )
-        }
-    }
-    return content
-}
-
-fun mapPlayerToTelegraph(player: Player, index: Int, localLastUpdated: String): List<Content> {
-    val content: MutableList<Content> = mutableListOf()
-    content.add(
-        Content(
-            tag = "p",
-            children = Json.encodeToJsonElement(listOf("Обновлено: ${localLastUpdated}"))
-        )
-    )
-    content.add(
-        Content(
-            tag = "a",
-            attrs = Attrs(href = "https://hpg.su"),
-            children = Json.encodeToJsonElement(listOf("Сайт HPG\n")),
-        )
-    )
-    content.add(
-        Content(
-            tag = "a",
-            attrs = Attrs(href = "https://telegra.ph/HPG4-Player-${index + 1}-inv-03-02"),
-            children = Json.encodeToJsonElement(listOf("Инвентарь\n")),
-        )
-    )
-    content.add(
-        Content(
-            tag = "a",
-            attrs = Attrs(href = "https://telegra.ph/Trofei-03-02"),
-            children = Json.encodeToJsonElement(listOf("Трофеи\n")),
-        )
-    )
-    content.add(
-        Content(
-            tag = "br",
-        )
-    )
-    //Effects
-    content.add(
-        Content(
-            tag = "h4",
-            attrs = Attrs("Эффекты"),
-            children = Json.encodeToJsonElement(
-                listOf(
-                    Content(
-                        tag = "a",
-                        attrs = Attrs(href = "#Эффекты"),
-                        children = Json.encodeToJsonElement(listOf("Эффекты")),
-                    )
-                )
-            ),
-        )
-    )
-    for (effect in player.effects) {
-        content.add(
-            Content(
-                tag = "b",
-                children = Json.encodeToJsonElement(listOf(effect.name + "\n")),
-            )
-        )
-        content.add(
-            Content(
-                tag = "p",
-                children = Json.encodeToJsonElement(listOf(effect.toString()))
-            )
-        )
-    }
-    //Characteristics
-    content.add(
-        Content(
-            tag = "h4",
-            attrs = Attrs("Характеристики"),
-            children = Json.encodeToJsonElement(
-                listOf(
-                    Content(
-                        tag = "a",
-                        attrs = Attrs(href = "#Характеристики"),
-                        children = Json.encodeToJsonElement(listOf("Характеристики")),
-                    )
-                )
-            ),
-        )
-    )
-    content.add(
-        Content(
-            tag = "p",
-            children = Json.encodeToJsonElement(listOf("${player.characteristics.authority.name}: ${player.characteristics.authority.actual}\n")),
-        )
-    )
-    content.add(
-        Content(
-            tag = "p",
-            children = Json.encodeToJsonElement(listOf("${player.characteristics.diplomacy.name}: ${player.characteristics.diplomacy.actual}\n")),
-        )
-    )
-    content.add(
-        Content(
-            tag = "p",
-            children = Json.encodeToJsonElement(listOf("${player.characteristics.persistence.name}: ${player.characteristics.persistence.actual}\n")),
-        )
-    )
-    content.add(
-        Content(
-            tag = "p",
-            children = Json.encodeToJsonElement(listOf("${player.characteristics.fortune.name}: ${player.characteristics.fortune.actual}\n")),
-        )
-    )
-    content.add(
-        Content(
-            tag = "p",
-            children = Json.encodeToJsonElement(listOf("${player.characteristics.practicality.name}: ${player.characteristics.practicality.actual}\n")),
-        )
-    )
-    content.add(
-        Content(
-            tag = "p",
-            children = Json.encodeToJsonElement(listOf("${player.characteristics.organization.name}: ${player.characteristics.organization.actual}\n")),
-        )
-    )
-    //Base
-    content.add(
-        Content(
-            tag = "h4",
-            attrs = Attrs("База"),
-            children = Json.encodeToJsonElement(
-                listOf(
-                    Content(
-                        tag = "a",
-                        attrs = Attrs(href = "#База"),
-                        children = Json.encodeToJsonElement(listOf("База")),
-                    )
-                )
-            ),
-        )
-    )
-    val base = bases.map.filter { it.sector.type == "BASE" }
-        .filter { it.sector.data.dynamicData?.controlledBy.equals(player.id) }
-        .first().sector.data.dynamicData!!.structures
-    content.add(
-        Content(
-            tag = "p",
-            children = Json.encodeToJsonElement(listOf("${base.arsenal.name}, уровень: ${base.arsenal.level}\n")),
-        )
-    )
-    content.add(
-        Content(
-            tag = "p",
-            children = Json.encodeToJsonElement(listOf("${base.familyClub.name}, уровень: ${base.familyClub.level}\n")),
-        )
-    )
-    content.add(
-        Content(
-            tag = "p",
-            children = Json.encodeToJsonElement(listOf("${base.garage.name}, уровень: ${base.garage.level}\n")),
-        )
-    )
-    content.add(
-        Content(
-            tag = "p",
-            children = Json.encodeToJsonElement(listOf("${base.stock.name}, уровень: ${base.stock.level}\n")),
-        )
-    )
-    content.add(
-        Content(
-            tag = "p",
-            children = Json.encodeToJsonElement(listOf("${base.pub.name}, уровень: ${base.pub.level}\n")),
-        )
-    )
-    content.add(
-        Content(
-            tag = "p",
-            children = Json.encodeToJsonElement(listOf("${base.headquarter.name}, уровень: ${base.headquarter.level}\n")),
-        )
-    )
-    content.add(
-        Content(
-            tag = "p",
-            children = Json.encodeToJsonElement(listOf("${base.gamblingClub.name}, уровень: ${base.gamblingClub.level}\n")),
-        )
-    )
-    //Family
-    content.add(
-        Content(
-            tag = "h4",
-            attrs = Attrs("Семья"),
-            children = Json.encodeToJsonElement(
-                listOf(
-                    Content(
-                        tag = "a",
-                        attrs = Attrs(href = "#Семья"),
-                        children = Json.encodeToJsonElement(listOf("Семья")),
-                    )
-                )
-            ),
-        )
-    )
-    for (member in player.family.members) {
-        content.add(
-            Content(
-                tag = "p",
-                children = Json.encodeToJsonElement(
-                    listOf(
-                        Content(
-                            tag = "strong",
-                            children = Json.encodeToJsonElement(listOf(member.data.name + "\n")),
-                        )
-                    )
-                ),
-            )
-        )
-        if (member.data.image != null)
-            content.add(
-                Content(
-                    tag = "p",
-                    children = Json.encodeToJsonElement(
-                        listOf(
-                            Content(
-                                tag = "img",
-                                attrs = Attrs(src = "https://hpg.su/assets/${member.data.image.replace(" ", "%20")}"),
-                            )
-                        )
-                    )
-                )
-            )
-        content.add(
-            Content(
-                tag = "p",
-                children = Json.encodeToJsonElement(listOf(member.data.toString()))
-            )
-        )
-    }
-    return content
-}
-
-suspend fun twitchHpgInfoCommand(event: ChannelMessageEvent, nick: String? = null) {
+fun twitchHpgInfoCommand(event: ChannelMessageEvent, nick: String? = null) {
     try {
         logger.info("twitch, hpg_info, message: ${event.message} user: ${event.user.name}")
         if (nick != null && nick.isNotEmpty()) {
@@ -763,6 +356,7 @@ suspend fun twitchHpgInfoCommand(event: ChannelMessageEvent, nick: String? = nul
     }
 }
 
+@OptIn(DelicateCoroutinesApi::class)
 suspend fun tgHpgInfoCommand(initialMessage: Message) {
     try {
         val inlineKeyboardMarkup = InlineKeyboardMarkup.create(
@@ -808,19 +402,21 @@ suspend fun tgHpgInfoCommand(initialMessage: Message) {
             replyMarkup = inlineKeyboardMarkup,
             text = "\uD83D\uDD54 Обновлено: ${lastUpdated} \uD83D\uDD04 каждые 5 минут\n" + "${
                 shortSummary.toString().removeSuffix("]").removePrefix("[").replace(", ", "")
-            }Сообщение автоудалится через 5 минут\nВыберите стримера для получения сводки\uD83D\uDC47:"
+            }${if (isPrivateMessage(initialMessage)) "" else "Сообщение автоудалится через 5 минут\n"}Выберите стримера для получения сводки\uD83D\uDC47:"
         )
-        GlobalScope.launch {
-            delay(5 * 60000L)
-            try {
-                tgBot.deleteMessage(chatId = ChatId.fromId(initialMessage.chat.id), message.get().messageId)
-            } catch (e: Throwable) {
-                logger.error("Failed delete message tgHpgInfoCommand", e)
-            }
-            try {
-                tgBot.deleteMessage(chatId = ChatId.fromId(initialMessage.chat.id), initialMessage.messageId)
-            } catch (e: Throwable) {
-                logger.error("Failed delete initialMessage tgHpgInfoCommand", e)
+        if (!isPrivateMessage(initialMessage)) {
+            GlobalScope.launch {
+                delay(5 * 60000L)
+                try {
+                    tgBot.deleteMessage(chatId = ChatId.fromId(initialMessage.chat.id), message.get().messageId)
+                } catch (e: Throwable) {
+                    logger.error("Failed delete message tgHpgInfoCommand", e)
+                }
+                try {
+                    tgBot.deleteMessage(chatId = ChatId.fromId(initialMessage.chat.id), initialMessage.messageId)
+                } catch (e: Throwable) {
+                    logger.error("Failed delete initialMessage tgHpgInfoCommand", e)
+                }
             }
         }
     } catch (e: Throwable) {
@@ -828,11 +424,15 @@ suspend fun tgHpgInfoCommand(initialMessage: Message) {
     }
 }
 
-suspend fun getPlayerInfo(nick: String): String {
+private fun isPrivateMessage(message: Message): Boolean {
+    return !message.chat.id.toString().startsWith("-100")
+}
+
+fun getPlayerInfo(nick: String): String {
     val player = playersExtended.firstOrNull { it.player.name.lowercase().trim().equals(nick.lowercase().trim()) }
         ?: return "Игрок под ником $nick не найден Sadge"
     return """${player.player.name} Ур.${player.player.level.current}${player.player.experience} Статус: ${player.player.states.main.mainStateFormatted}
-Доход в день:💰${player.player.dailyIncome} Всего:💰${player.player.money}
+Доход в день:💰${player.player.dailyIncome.removeSuffix(".0")} Всего:💰${player.player.money.removeSuffix(".0")}
 Интерес полиции:👮${player.player.policeInterest.current}/${player.player.policeInterest.maximum}
 Мораль:🔱${player.player.morale.current}/${player.player.morale.maximum}
 Эффектов:😊${player.player.positiveEffects.size}😐${player.player.negativeEffects.size}😤${player.player.otherEffects.size}
@@ -840,7 +440,7 @@ suspend fun getPlayerInfo(nick: String): String {
         """.trimIndent()
 }
 
-suspend fun getPlayerTphUrl(nick: String): String {
+fun getPlayerTphUrl(nick: String): String {
     val player = playersExtended.firstOrNull { it.player.name.lowercase().trim().equals(nick.lowercase().trim()) }
         ?: return ""
     return " Инфо: " + player.telegraphUrl

@@ -28,9 +28,9 @@ data class LeaderBoard(
     val list: List<Leader> = listOf(),
 ) {
     override fun toString(): String {
-        var leaders: String = ""
+        var leaders = ""
         for(leader in list) {
-            leaders += "${leader.toString()} "
+            leaders += "$leader "
         }
 
         return leaders.trim()

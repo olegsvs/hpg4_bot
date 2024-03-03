@@ -1,6 +1,5 @@
 package model
 
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -96,7 +95,7 @@ data class Slots(
     val legs: Item?,
 ) {
     fun getListItem(items: List<Item?>?) : String {
-        if(items.isNullOrEmpty()) return "Пусто"
+        return if(items.isNullOrEmpty()) "Пусто"
         else {
             var res = ""
             for(item in items) {
@@ -104,17 +103,17 @@ data class Slots(
                 res +=item.name + ", "
             }
             if(res.isEmpty()) {
-                return "Пусто"
+                "Пусто"
             } else {
-                return res.removeSuffix(", ")
+                res.removeSuffix(", ")
             }
         }
     }
 
     fun getItem(item: Item?) : String {
-        if(item == null) return "Пусто"
+        return if(item == null) "Пусто"
         else {
-            return item.name?:"Пусто"
+            item.name?:"Пусто"
         }
     }
 }
@@ -122,8 +121,7 @@ data class Slots(
 @Serializable
 data class Item(
     val name: String?,
-) {
-}
+)
 
 @Serializable
 data class Player(
@@ -131,8 +129,8 @@ data class Player(
     val name: String,
     val avatar: Avatar,
     val level: Level,
-    val dailyIncome: Double,
-    val money: Double,
+    val dailyIncome: String,
+    val money: String,
     val hp: HitPoints,
     val effects: List<Effect> = listOf(),
     val policeInterest: PoliceInterest,
@@ -183,7 +181,7 @@ data class Effect(
         }
 
     override fun toString(): String {
-        return "Тип:${typeFormatted}\nОписание:${description}\nДлительность:${duration}\nИсточник: ${source}"
+        return "Тип: ${typeFormatted}\nОписание: ${description}\nДлительность: ${duration}\nИсточник: $source"
     }
 
 
@@ -197,8 +195,7 @@ data class Characteristic(
     val authority: Authority,
     val practicality: Practicality,
     val organization: Organization,
-) {
-}
+)
 
 @Serializable
 data class Persistence(
@@ -286,16 +283,21 @@ data class Skill(
     val lore: String,
     val description: String,
 ) {
+    val typeFormatted: String
+        get() = when (type.lowercase()) {
+            "passive" -> "Пассивный"
+            "active" -> "Активный"
+            else -> type
+        }
     override fun toString(): String {
-        return "$name\n$lore\nОписание:$description\nТип:$type\nКд:$cooldown\n"
+        return "$name\n$lore\nОписание: $description\nТип: $typeFormatted\nКд: $cooldown\n"
     }
 }
 
 @Serializable
 class FamilyMember(
     val data: FamilyData
-) {
-}
+)
 
 @Serializable
 class FamilyData(
@@ -311,7 +313,7 @@ class FamilyData(
         return if(skills.isNullOrEmpty()) {
             "Нету"
         } else {
-            var result: String = ""
+            var result = "\n"
             for(skill in skills) {
                 result += skill.toString() + "\n"
             }
@@ -327,7 +329,7 @@ class FamilyData(
             }
         }
     override fun toString(): String {
-        return "${descriptionString}Тир:$tier\nБоевая мощь:$combatPower\nСкиллы:\n${skillsString}"
+        return "${descriptionString}Тир: $tier\nБоевая мощь: $combatPower\nСкиллы: ${skillsString}"
     }
 }
 
