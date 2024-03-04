@@ -18,7 +18,7 @@ HPG_MAP_URL = os.getenv("HPG_MAP_URL")
 
 # dd/mm/YY H:M:S
 # 04.03.2024 05:35 GMT+3
-dt_string = datetime.now().strftime("%d.%m.%Y %H:%M")
+dt_string = datetime.now().strftime("%d.%m.%Y %H:%M") + " GMT+3"
 
 #driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
 chrome_options = Options()

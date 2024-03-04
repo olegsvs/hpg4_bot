@@ -88,7 +88,7 @@ val twitchClient: TwitchClient = TwitchClientBuilder.builder()
 val httpClient = HttpClient(CIO) {
     expectSuccess = true
     install(Logging) {
-        level = LogLevel.BODY
+        level = LogLevel.INFO
     }
     install(HttpTimeout)
     install(ContentNegotiation) {
@@ -293,7 +293,7 @@ suspend fun fetchData() {
                     )
                 )
             }.body<Root>().result.url
-            delay(1500L)
+            delay(1700L)
             val inventoryUrl = httpClient.post("https://api.telegra.ph/editPage/HPG4-Player-${index + 1}-inv-03-02") {
                 timeout {
                     requestTimeoutMillis = 60000
@@ -308,7 +308,7 @@ suspend fun fetchData() {
                     )
                 )
             }.body<Root>().result.url
-            delay(1500L)
+            delay(1700L)
             val effectsUrl = httpClient.post("https://api.telegra.ph/editPage/HPG4-Player-${index + 1}-effects-03-03") {
                 timeout {
                     requestTimeoutMillis = 60000
@@ -323,7 +323,7 @@ suspend fun fetchData() {
                     )
                 )
             }.body<Root>().result.url
-            delay(1500L)
+            delay(1700L)
             val logGamesUrl = httpClient.post("https://api.telegra.ph/editPage/HPG4-Player-${index + 1}-log-games-03-03") {
                 timeout {
                     requestTimeoutMillis = 60000
@@ -338,7 +338,7 @@ suspend fun fetchData() {
                     )
                 )
             }.body<Root>().result.url
-            delay(1500L)
+            delay(1700L)
             val logActionsUrl = httpClient.post("https://api.telegra.ph/editPage/HPG4-Player-${index + 1}-log-actions-03-03") {
                 timeout {
                     requestTimeoutMillis = 60000
@@ -353,10 +353,10 @@ suspend fun fetchData() {
                     )
                 )
             }.body<Root>().result.url
-            delay(1500L)
+            delay(1700L)
             playersExtended.add(PlayerExtended(player, telegraphUrl, inventoryUrl, effectsUrl, logGamesUrl, logActionsUrl))
         }
-        delay(1500L)
+        delay(1700L)
         trophiesUrl = httpClient.post("https://api.telegra.ph/editPage/Trofei-03-02") {
             timeout {
                 requestTimeoutMillis = 60000
@@ -372,6 +372,7 @@ suspend fun fetchData() {
             )
         }.body<Root>().result.url
         try{
+            delay(1700L)
             val mapImageUrl = File("map_imgur.txt").readText()
             val mapUpdateTime = File("map_update_time.txt").readText()
             httpClient.post("https://api.telegra.ph/editPage/HPG4-Map-03-04") {
