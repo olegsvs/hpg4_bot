@@ -1,10 +1,76 @@
-package model
+package model.hpg
 
 import kotlinx.serialization.Serializable
 
 @Serializable
 data class Players(
     val players: List<Player>
+)
+
+@Serializable
+data class Player(
+    val id: String,
+    val name: String,
+    val avatar: Avatar,
+    val level: Level,
+    val dailyIncome: String,
+    val money: String,
+    val hp: HitPoints,
+    val effects: List<Effect> = listOf(),
+    val policeInterest: PoliceInterest,
+    val combatPower: CombatPower,
+    val influence: Int,
+    val morale: Morale,
+    val congressTokens: Int,
+    val states: PlayerState,
+    val characteristics: Characteristic,
+    val family: Family,
+    val inventory: Inventory,
+    val actionPoints: ActionPoints,
+    val logs: List<ActionLog> = listOf(),
+    val gameLogs: List<GameLog> = listOf(),
+) {
+    val experience: String
+        get() = "[${level.experience.current}/${level.experience.maximum}]"
+
+    val positiveEffects: List<Effect>
+        get() = effects.filter { it.type == "positive" }
+    val negativeEffects: List<Effect>
+        get() = effects.filter { it.type == "negative" }
+    val otherEffects: List<Effect>
+        get() = effects.filter { it.type == "neutral" }
+}
+
+@Serializable
+data class ActionLog(
+    val text: String,
+    val updatedAt: String,
+)
+
+@Serializable
+data class GameLog(
+    val status: String,
+    val updatedAt: String,
+    val review: String?,
+    val game: LogGame
+) {
+val statusFormatted: String
+    get() = when (status.lowercase()) {
+        "completed" -> "✅ Пройдена"
+        "rerolled" -> "\uD83D\uDD04 Реролл"
+        "dropped" -> "❌ Дроп"
+        "freedropped" -> "❎ Дроп без последствий"
+        "playing" -> "\uD83D\uDE80 В процессе"
+        else -> status
+    }
+}
+
+@Serializable
+data class LogGame(
+    val name: String,
+    val image: String?,
+    val link: String,
+    val ggp: Int,
 )
 
 @Serializable
@@ -61,12 +127,12 @@ data class MainState(
 ) {
     val mainStateFormatted: String
         get() = when (value.lowercase()) {
-        "rolling game" -> "Поиск игры"
-        "map interaction" -> "Взаимодействие с картой"
-        "capturing" -> "Захват сектора"
-        "capture completion" -> "Завершение захвата"
-        else -> value
-    }
+            "rolling game" -> "Поиск игры"
+            "map interaction" -> "Взаимодействие с картой"
+            "capturing" -> "Захват сектора"
+            "capture completion" -> "Завершение захвата"
+            else -> value
+        }
 }
 
 @Serializable
@@ -124,44 +190,60 @@ data class Item(
 )
 
 @Serializable
-data class Player(
-    val id: String,
-    val name: String,
-    val avatar: Avatar,
-    val level: Level,
-    val dailyIncome: String,
-    val money: String,
-    val hp: HitPoints,
-    val effects: List<Effect> = listOf(),
-    val policeInterest: PoliceInterest,
-    val combatPower: CombatPower,
-    val influence: Int,
-    val morale: Morale,
-    val congressTokens: Int,
-    val states: PlayerState,
-    val characteristics: Characteristic,
-    val family: Family,
-    val inventory: Inventory,
+data class ActionPoints(
+    val turns: TurnsActions,
+    val movement: MovementActions,
+    val exploring: ExploringActions,
+)
+
+@Serializable
+data class DailyActions(
+    val current: Int,
+    val maximum: Int,
 ) {
-    val experience: String
-        get() = "[${level.experience.current}/${level.experience.maximum}]"
-
-    val positiveEffects: List<Effect>
-        get() = effects.filter { it.type == "positive" }
-    val negativeEffects: List<Effect>
-        get() = effects.filter { it.type == "negative" }
-    val otherEffects: List<Effect>
-        get() = effects.filter { it.type == "neutral" }
-
-    /*fun lose(): User {
-        duelLoses++
-        return this
+    override fun toString(): String {
+        return "ежедневные: $current/$maximum"
     }
+}
 
-    fun win(toAdd: Int  = 1): User {
-        duelWins+=toAdd
-        return this
-    }*/
+@Serializable
+data class ExploringActions(
+    val current: Int,
+    val maximum: Int,
+) {
+    override fun toString(): String {
+        return "Изучение: $current/$maximum"
+    }
+}
+
+@Serializable
+data class MovementActions(
+    val current: Int,
+    val maximum: Int,
+) {
+    override fun toString(): String {
+        return "Передвижение: $current/$maximum"
+    }
+}
+
+@Serializable
+data class WeeklyActions(
+    val current: Int,
+    val maximum: Int,
+) {
+    override fun toString(): String {
+        return "еженедельные: $current/$maximum"
+    }
+}
+
+@Serializable
+data class TurnsActions(
+    val weekly: WeeklyActions,
+    val daily: DailyActions,
+) {
+    override fun toString(): String {
+        return "Повороты: $daily, $weekly"
+    }
 }
 
 @Serializable

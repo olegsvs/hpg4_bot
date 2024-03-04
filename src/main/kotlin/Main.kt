@@ -26,6 +26,13 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.Json
 import model.*
+import model.hpg.Bases
+import model.hpg.Player
+import model.hpg.Players
+import model.hpg.Trophies
+import model.telegraph.Root
+import model.telegraph.RootPage
+import model.telegraph.TelegraphMapper
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.time.LocalDateTime
@@ -54,12 +61,15 @@ var trophies: Trophies = Trophies(listOf())
 var bases: Bases = Bases(listOf())
 var lastUpdated = ""
 var trophiesUrl = ""
+var mapUrl = "https://telegra.ph/Karta-03-03-2"
 
 data class PlayerExtended(
     val player: Player,
     val telegraphUrl: String,
     val inventoryUrl: String,
-    val effectsUrl: String
+    val effectsUrl: String,
+    val logGamesUrl: String,
+    val logActionsUrl: String
 ) {}
 
 val twitchClient: TwitchClient = TwitchClientBuilder.builder()
@@ -69,7 +79,7 @@ val twitchClient: TwitchClient = TwitchClientBuilder.builder()
     .withEnablePubSub(false)
     .withClientId(twitchClientId)
     .withClientSecret(twitchClientSecret)
-//    .withFeignLogLevel(feign.Logger.model.Level.NONE)
+//    .withFeignLogLevel(feign.Logger.model.hpg.Level.NONE)
     .withDefaultEventHandler(SimpleEventHandler::class.java)
     .build()
 
@@ -109,8 +119,8 @@ val tgBot = bot {
                 val markup = InlineKeyboardMarkup.create(
                     listOf(
                         InlineKeyboardButton.Url(
-                            text = "Эффекты",
-                            url = player.effectsUrl,
+                            text = "Инфо",
+                            url = player.telegraphUrl,
                         ),
                         InlineKeyboardButton.Url(
                             text = "Характеристики",
@@ -133,8 +143,18 @@ val tgBot = bot {
                             url = "${player.telegraphUrl}#База",
                         ),
                         InlineKeyboardButton.Url(
-                            text = "Сайт HPG",
-                            url = "https://hpg.su/",
+                            text = "Эффекты",
+                            url = player.effectsUrl,
+                        ),
+                    ),
+                    listOf(
+                        InlineKeyboardButton.Url(
+                            text = "Лог действий",
+                            url = player.logActionsUrl,
+                        ),
+                        InlineKeyboardButton.Url(
+                            text = "Лог игр",
+                            url = player.logGamesUrl,
                         ),
                     ),
                 )
@@ -301,7 +321,37 @@ suspend fun fetchData() {
                 )
             }.body<Root>().result.url
             delay(1500L)
-            playersExtended.add(PlayerExtended(player, telegraphUrl, inventoryUrl, effectsUrl))
+            val logGamesUrl = httpClient.post("https://api.telegra.ph/editPage/HPG4-Player-${index + 1}-log-games-03-03") {
+                timeout {
+                    requestTimeoutMillis = 60000
+                }
+                contentType(ContentType.Application.Json)
+                setBody(
+                    RootPage(
+                        telegraphMapper.mapGameLogsToTelegraph(player, localLastUpdated),
+                        telegraphApikey,
+                        "Лог игр ${player.name}",
+                        returnContent = false
+                    )
+                )
+            }.body<Root>().result.url
+            delay(1500L)
+            val logActionsUrl = httpClient.post("https://api.telegra.ph/editPage/HPG4-Player-${index + 1}-log-actions-03-03") {
+                timeout {
+                    requestTimeoutMillis = 60000
+                }
+                contentType(ContentType.Application.Json)
+                setBody(
+                    RootPage(
+                        telegraphMapper.mapActionLogsToTelegraph(player, localLastUpdated),
+                        telegraphApikey,
+                        "Лог действий ${player.name}",
+                        returnContent = false
+                    )
+                )
+            }.body<Root>().result.url
+            delay(1500L)
+            playersExtended.add(PlayerExtended(player, telegraphUrl, inventoryUrl, effectsUrl, logGamesUrl, logActionsUrl))
         }
         delay(1500L)
         trophiesUrl = httpClient.post("https://api.telegra.ph/editPage/Trofei-03-02") {
@@ -389,6 +439,14 @@ suspend fun tgHpgInfoCommand(initialMessage: Message) {
                     text = "Трофеи",
                     url = trophiesUrl,
                 ),
+                InlineKeyboardButton.Url(
+                    text = "Карта",
+                    url = mapUrl,
+                ),
+                InlineKeyboardButton.Url(
+                    text = "Сайт HPG",
+                    url = "https://hpg.su/",
+                ),
             ),
         )
         val shortSummary = playersExt.players.map {
@@ -432,11 +490,13 @@ fun getPlayerInfo(nick: String): String {
     val player = playersExtended.firstOrNull { it.player.name.lowercase().trim().equals(nick.lowercase().trim()) }
         ?: return "Игрок под ником $nick не найден Sadge"
     return """${player.player.name} Ур.${player.player.level.current}${player.player.experience} Статус: ${player.player.states.main.mainStateFormatted}
-Доход в день:💰${player.player.dailyIncome.removeSuffix(".0")} Всего:💰${player.player.money.removeSuffix(".0")}
+Доход в день:💰${player.player.dailyIncome.removeSuffix(".0")} На руках:💰${player.player.money.removeSuffix(".0")}
+Жетоны конгресса:🗣${player.player.congressTokens}
 Интерес полиции:👮${player.player.policeInterest.current}/${player.player.policeInterest.maximum}
 Мораль:🔱${player.player.morale.current}/${player.player.morale.maximum}
 Эффектов:😊${player.player.positiveEffects.size}😐${player.player.negativeEffects.size}😤${player.player.otherEffects.size}
-Параметры:❤${player.player.hp.current}/${player.player.hp.maximum}💪${player.player.combatPower.current}/${player.player.combatPower.maximum}
+HP:❤${player.player.hp.current}/${player.player.hp.maximum}
+Боевая мощь:💪${player.player.combatPower.current}/${player.player.combatPower.maximum}
         """.trimIndent()
 }
 

@@ -1,4 +1,4 @@
-package model
+package model.telegraph
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

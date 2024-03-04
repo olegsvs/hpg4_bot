@@ -1,4 +1,4 @@
-package model
+package model.hpg
 
 import com.google.gson.annotations.SerializedName
 import kotlinx.serialization.Serializable

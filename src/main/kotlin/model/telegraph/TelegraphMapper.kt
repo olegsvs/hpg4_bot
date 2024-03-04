@@ -1,9 +1,19 @@
-package model
+package model.telegraph
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
+import model.hpg.Bases
+import model.hpg.Player
+import model.hpg.Trophies
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 class TelegraphMapper {
+    //2024-02-20T18:47:39.348Z
+    private val apiFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
+    private val botFormat = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
+
     fun mapEffectsToTelegraph(player: Player, localLastUpdated: String): List<Content> {
         val content: MutableList<Content> = mutableListOf()
         content.add(
@@ -13,7 +23,46 @@ class TelegraphMapper {
             )
         )
         //Effects
-        for (effect in player.effects) {
+        content.add(
+            Content(
+                tag = "a",
+                attrs = Attrs(href = "#Отрицательные"),
+                children = Json.encodeToJsonElement(listOf("Отрицательные")),
+            )
+        )
+        content.add(
+            Content(
+                tag = "br",
+            )
+        )
+        content.add(
+            Content(
+                tag = "a",
+                attrs = Attrs(href = "#Другие"),
+                children = Json.encodeToJsonElement(listOf("Другие")),
+            )
+        )
+        content.add(
+            Content(
+                tag = "br",
+            )
+        )
+        content.add(
+            Content(
+                tag = "h4",
+                attrs = Attrs("Положительные:"),
+                children = Json.encodeToJsonElement(
+                    listOf(
+                        Content(
+                            tag = "a",
+                            attrs = Attrs(href = "#Положительные"),
+                            children = Json.encodeToJsonElement(listOf("Положительные")),
+                        )
+                    )
+                ),
+            )
+        )
+        for (effect in player.positiveEffects) {
             content.add(
                 Content(
                     tag = "b",
@@ -22,7 +71,65 @@ class TelegraphMapper {
             )
             content.add(
                 Content(
-                    tag = "p",
+                    tag = "blockquote",
+                    children = Json.encodeToJsonElement(listOf(effect.toString()))
+                )
+            )
+        }
+        content.add(
+            Content(
+                tag = "h4",
+                attrs = Attrs("Отрицательные"),
+                children = Json.encodeToJsonElement(
+                    listOf(
+                        Content(
+                            tag = "a",
+                            attrs = Attrs(href = "#Отрицательные"),
+                            children = Json.encodeToJsonElement(listOf("Отрицательные")),
+                        )
+                    )
+                ),
+            )
+        )
+        for (effect in player.negativeEffects) {
+            content.add(
+                Content(
+                    tag = "b",
+                    children = Json.encodeToJsonElement(listOf(effect.name + "\n")),
+                )
+            )
+            content.add(
+                Content(
+                    tag = "blockquote",
+                    children = Json.encodeToJsonElement(listOf(effect.toString()))
+                )
+            )
+        }
+        content.add(
+            Content(
+                tag = "h4",
+                attrs = Attrs("Другие"),
+                children = Json.encodeToJsonElement(
+                    listOf(
+                        Content(
+                            tag = "a",
+                            attrs = Attrs(href = "#Другие"),
+                            children = Json.encodeToJsonElement(listOf("Другие")),
+                        )
+                    )
+                ),
+            )
+        )
+        for (effect in player.otherEffects) {
+            content.add(
+                Content(
+                    tag = "b",
+                    children = Json.encodeToJsonElement(listOf(effect.name + "\n")),
+                )
+            )
+            content.add(
+                Content(
+                    tag = "blockquote",
                     children = Json.encodeToJsonElement(listOf(effect.toString()))
                 )
             )
@@ -47,7 +154,7 @@ class TelegraphMapper {
         )
         content.add(
             Content(
-                tag = "p",
+                tag = "blockquote",
                 children = Json.encodeToJsonElement(listOf(player.inventory.slots.getListItem(player.inventory.slots.rings)))
             )
         )
@@ -59,7 +166,7 @@ class TelegraphMapper {
         )
         content.add(
             Content(
-                tag = "p",
+                tag = "blockquote",
                 children = Json.encodeToJsonElement(listOf(player.inventory.slots.getListItem(player.inventory.slots.pockets)))
             )
         )
@@ -71,7 +178,7 @@ class TelegraphMapper {
         )
         content.add(
             Content(
-                tag = "p",
+                tag = "blockquote",
                 children = Json.encodeToJsonElement(listOf(player.inventory.slots.getListItem(player.inventory.slots.wheels)))
             )
         )
@@ -83,7 +190,7 @@ class TelegraphMapper {
         )
         content.add(
             Content(
-                tag = "p",
+                tag = "blockquote",
                 children = Json.encodeToJsonElement(listOf(player.inventory.slots.getListItem(player.inventory.slots.stock)))
             )
         )
@@ -93,12 +200,9 @@ class TelegraphMapper {
                 children = Json.encodeToJsonElement(listOf("Перчатки: \n")),
             )
         )
-        /* for(item in player.inventory.slots.stock!!) {
-             println(item.toString())
-         }*/
         content.add(
             Content(
-                tag = "p",
+                tag = "blockquote",
                 children = Json.encodeToJsonElement(listOf(player.inventory.slots.getItem(player.inventory.slots.gloves)))
             )
         )
@@ -110,7 +214,7 @@ class TelegraphMapper {
         )
         content.add(
             Content(
-                tag = "p",
+                tag = "blockquote",
                 children = Json.encodeToJsonElement(listOf(player.inventory.slots.getItem(player.inventory.slots.head)))
             )
         )
@@ -122,7 +226,7 @@ class TelegraphMapper {
         )
         content.add(
             Content(
-                tag = "p",
+                tag = "blockquote",
                 children = Json.encodeToJsonElement(listOf(player.inventory.slots.getItem(player.inventory.slots.body)))
             )
         )
@@ -134,7 +238,7 @@ class TelegraphMapper {
         )
         content.add(
             Content(
-                tag = "p",
+                tag = "blockquote",
                 children = Json.encodeToJsonElement(listOf(player.inventory.slots.getItem(player.inventory.slots.clothes)))
             )
         )
@@ -146,7 +250,7 @@ class TelegraphMapper {
         )
         content.add(
             Content(
-                tag = "p",
+                tag = "blockquote",
                 children = Json.encodeToJsonElement(listOf(player.inventory.slots.getItem(player.inventory.slots.belt)))
             )
         )
@@ -158,7 +262,7 @@ class TelegraphMapper {
         )
         content.add(
             Content(
-                tag = "p",
+                tag = "blockquote",
                 children = Json.encodeToJsonElement(listOf(player.inventory.slots.getItem(player.inventory.slots.shoes)))
             )
         )
@@ -170,7 +274,7 @@ class TelegraphMapper {
         )
         content.add(
             Content(
-                tag = "p",
+                tag = "blockquote",
                 children = Json.encodeToJsonElement(listOf(player.inventory.slots.getItem(player.inventory.slots.chain)))
             )
         )
@@ -182,7 +286,7 @@ class TelegraphMapper {
         )
         content.add(
             Content(
-                tag = "p",
+                tag = "blockquote",
                 children = Json.encodeToJsonElement(listOf(player.inventory.slots.getItem(player.inventory.slots.legs)))
             )
         )
@@ -201,13 +305,13 @@ class TelegraphMapper {
         for (trophy in trophies.trophies) {
             content.add(
                 Content(
-                    tag = "b",
+                    tag = "blockquote",
                     children = Json.encodeToJsonElement(listOf(trophy.name + "\n")),
                 )
             )
             content.add(
                 Content(
-                    tag = "p",
+                    tag = "blockquote",
                     children = Json.encodeToJsonElement(listOf(trophy.toString()))
                 )
             )
@@ -236,28 +340,79 @@ class TelegraphMapper {
             Content(
                 tag = "a",
                 attrs = Attrs(href = "https://hpg.su"),
-                children = Json.encodeToJsonElement(listOf("Сайт HPG\n")),
+                children = Json.encodeToJsonElement(listOf("Сайт HPG")),
             )
         )
         content.add(
             Content(
-                tag = "a",
-                attrs = Attrs(href = "https://telegra.ph/HPG4-Player-${index + 1}-inv-03-02"),
-                children = Json.encodeToJsonElement(listOf("Инвентарь\n")),
-            )
-        )
-        content.add(
-            Content(
-                tag = "a",
-                attrs = Attrs(href = "https://telegra.ph/HPG4-Player-${index + 1}-effects-03-03"),
-                children = Json.encodeToJsonElement(listOf("Эффекты\n")),
+                tag = "br",
             )
         )
         content.add(
             Content(
                 tag = "a",
                 attrs = Attrs(href = "https://telegra.ph/Trofei-03-02"),
-                children = Json.encodeToJsonElement(listOf("Трофеи\n")),
+                children = Json.encodeToJsonElement(listOf("Трофеи")),
+            )
+        )
+        content.add(
+            Content(
+                tag = "br",
+            )
+        )
+        content.add(
+            Content(
+                tag = "a",
+                attrs = Attrs(href = "https://telegra.ph/Karta-03-03-2"),
+                children = Json.encodeToJsonElement(listOf("Карта")),
+            )
+        )
+        content.add(
+            Content(
+                tag = "br",
+            )
+        )
+        content.add(
+            Content(
+                tag = "a",
+                attrs = Attrs(href = "https://telegra.ph/HPG4-Player-${index + 1}-inv-03-02"),
+                children = Json.encodeToJsonElement(listOf("Инвентарь ${player.name}")),
+            )
+        )
+        content.add(
+            Content(
+                tag = "br",
+            )
+        )
+        content.add(
+            Content(
+                tag = "a",
+                attrs = Attrs(href = "https://telegra.ph/HPG4-Player-${index + 1}-effects-03-03"),
+                children = Json.encodeToJsonElement(listOf("Эффекты ${player.name}")),
+            )
+        )
+        content.add(
+            Content(
+                tag = "br",
+            )
+        )
+        content.add(
+            Content(
+                tag = "a",
+                attrs = Attrs(href = "https://telegra.ph/HPG4-Player-${index + 1}-log-actions-03-03"),
+                children = Json.encodeToJsonElement(listOf("Лог действий ${player.name}")),
+            )
+        )
+        content.add(
+            Content(
+                tag = "br",
+            )
+        )
+        content.add(
+            Content(
+                tag = "a",
+                attrs = Attrs(href = "https://telegra.ph/HPG4-Player-${index + 1}-log-games-03-03"),
+                children = Json.encodeToJsonElement(listOf("Лог игр ${player.name}")),
             )
         )
         content.add(
@@ -283,38 +438,72 @@ class TelegraphMapper {
         )
         content.add(
             Content(
-                tag = "p",
+                tag = "blockquote",
                 children = Json.encodeToJsonElement(listOf("${player.characteristics.authority.name}: ${player.characteristics.authority.actual}\n")),
             )
         )
         content.add(
             Content(
-                tag = "p",
+                tag = "blockquote",
                 children = Json.encodeToJsonElement(listOf("${player.characteristics.diplomacy.name}: ${player.characteristics.diplomacy.actual}\n")),
             )
         )
         content.add(
             Content(
-                tag = "p",
+                tag = "blockquote",
                 children = Json.encodeToJsonElement(listOf("${player.characteristics.persistence.name}: ${player.characteristics.persistence.actual}\n")),
             )
         )
         content.add(
             Content(
-                tag = "p",
+                tag = "blockquote",
                 children = Json.encodeToJsonElement(listOf("${player.characteristics.fortune.name}: ${player.characteristics.fortune.actual}\n")),
             )
         )
         content.add(
             Content(
-                tag = "p",
+                tag = "blockquote",
                 children = Json.encodeToJsonElement(listOf("${player.characteristics.practicality.name}: ${player.characteristics.practicality.actual}\n")),
             )
         )
         content.add(
             Content(
-                tag = "p",
+                tag = "blockquote",
                 children = Json.encodeToJsonElement(listOf("${player.characteristics.organization.name}: ${player.characteristics.organization.actual}\n")),
+            )
+        )
+        //Actions Points
+        content.add(
+            Content(
+                tag = "h4",
+                attrs = Attrs("Очки действий"),
+                children = Json.encodeToJsonElement(
+                    listOf(
+                        Content(
+                            tag = "a",
+                            attrs = Attrs(href = "#Очки_действий"),
+                            children = Json.encodeToJsonElement(listOf("Очки действий")),
+                        )
+                    )
+                ),
+            )
+        )
+        content.add(
+            Content(
+                tag = "blockquote",
+                children = Json.encodeToJsonElement(listOf("${player.actionPoints.turns}\n")),
+            )
+        )
+        content.add(
+            Content(
+                tag = "blockquote",
+                children = Json.encodeToJsonElement(listOf("${player.actionPoints.movement}\n")),
+            )
+        )
+        content.add(
+            Content(
+                tag = "blockquote",
+                children = Json.encodeToJsonElement(listOf("${player.actionPoints.exploring}\n")),
             )
         )
         //Base
@@ -337,43 +526,43 @@ class TelegraphMapper {
             .first { it.sector.data.dynamicData?.controlledBy.equals(player.id) }.sector.data.dynamicData!!.structures
         content.add(
             Content(
-                tag = "p",
+                tag = "blockquote",
                 children = Json.encodeToJsonElement(listOf("${base.arsenal.name}, уровень: ${base.arsenal.level}\n")),
             )
         )
         content.add(
             Content(
-                tag = "p",
+                tag = "blockquote",
                 children = Json.encodeToJsonElement(listOf("${base.familyClub.name}, уровень: ${base.familyClub.level}\n")),
             )
         )
         content.add(
             Content(
-                tag = "p",
+                tag = "blockquote",
                 children = Json.encodeToJsonElement(listOf("${base.garage.name}, уровень: ${base.garage.level}\n")),
             )
         )
         content.add(
             Content(
-                tag = "p",
+                tag = "blockquote",
                 children = Json.encodeToJsonElement(listOf("${base.stock.name}, уровень: ${base.stock.level}\n")),
             )
         )
         content.add(
             Content(
-                tag = "p",
+                tag = "blockquote",
                 children = Json.encodeToJsonElement(listOf("${base.pub.name}, уровень: ${base.pub.level}\n")),
             )
         )
         content.add(
             Content(
-                tag = "p",
+                tag = "blockquote",
                 children = Json.encodeToJsonElement(listOf("${base.headquarter.name}, уровень: ${base.headquarter.level}\n")),
             )
         )
         content.add(
             Content(
-                tag = "p",
+                tag = "blockquote",
                 children = Json.encodeToJsonElement(listOf("${base.gamblingClub.name}, уровень: ${base.gamblingClub.level}\n")),
             )
         )
@@ -430,8 +619,116 @@ class TelegraphMapper {
                 )
             content.add(
                 Content(
-                    tag = "p",
+                    tag = "blockquote",
                     children = Json.encodeToJsonElement(listOf(member.data.toString()))
+                )
+            )
+        }
+        return content
+    }
+
+    fun mapGameLogsToTelegraph(player: Player, localLastUpdated: String): List<Content> {
+        val content: MutableList<Content> = mutableListOf()
+        content.add(
+            Content(
+                tag = "pre",
+                children = Json.encodeToJsonElement(listOf("Обновлено: $localLastUpdated"))
+            )
+        )
+        content.add(
+            Content(
+                tag = "pre",
+                children = Json.encodeToJsonElement(listOf("Последние 30 записей"))
+            )
+        )
+        //GameLogs
+        for (gameLog in player.gameLogs.take(30)) {
+            content.add(
+                Content(
+                    tag = "blockquote",
+                    children = Json.encodeToJsonElement(
+                        listOf(
+                            Content(
+                                tag = "a",
+                                attrs = Attrs(href = gameLog.game.link),
+                                children = Json.encodeToJsonElement(
+                                    listOf(
+                                        Content(
+                                            tag = "strong",
+                                            children = Json.encodeToJsonElement(listOf(gameLog.game.name))
+                                        )
+                                    )
+                                ),
+                            )
+                        )
+                    )
+                )
+            )
+            if (!gameLog.game.image.isNullOrEmpty())
+                content.add(
+                    Content(
+                        tag = "img",
+                        attrs = Attrs(
+                            src = gameLog.game.image
+                        ),
+                    )
+                )
+            content.add(
+                Content(
+                    tag = "blockquote",
+                    children = Json.encodeToJsonElement(listOf("GGP: ${gameLog.game.ggp}"))
+                )
+            )
+            content.add(
+                Content(
+                    tag = "blockquote",
+                    children = Json.encodeToJsonElement(listOf("Статус: ${gameLog.statusFormatted}"))
+                )
+            )
+            if (!gameLog.review.isNullOrEmpty())
+                content.add(
+                    Content(
+                        tag = "blockquote",
+                        children = Json.encodeToJsonElement(listOf("Отзыв: ${gameLog.review}"))
+                    )
+                )
+            content.add(
+                Content(
+                    tag = "p",
+                    children = Json.encodeToJsonElement(listOf("\n"))
+                )
+            )
+        }
+        return content
+    }
+
+    fun mapActionLogsToTelegraph(player: Player, localLastUpdated: String): List<Content> {
+        val content: MutableList<Content> = mutableListOf()
+        content.add(
+            Content(
+                tag = "pre",
+                children = Json.encodeToJsonElement(listOf("Обновлено: $localLastUpdated"))
+            )
+        )
+        content.add(
+            Content(
+                tag = "pre",
+                children = Json.encodeToJsonElement(listOf("Последние 50 записей"))
+            )
+        )
+        //ActionLogs
+        for (actionLog in player.logs.take(50)) {
+            var dateTime = actionLog.text
+            try {
+                dateTime = "${LocalDateTime.parse(actionLog.updatedAt, apiFormat).format(botFormat)} ${actionLog.text}"
+            } catch (_: Throwable) {
+            }
+            content.add(
+                Content(
+                    tag = "blockquote",
+                    children = Json.encodeToJsonElement(
+                        listOf(dateTime)
+                    )
                 )
             )
         }
