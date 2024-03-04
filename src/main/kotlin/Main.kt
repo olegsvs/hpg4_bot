@@ -278,7 +278,7 @@ suspend fun fetchData() {
         playersExt = Gson().fromJson(response, Players::class.java)
         bases = Gson().fromJson(response, Bases::class.java)
         val localLastUpdated = LocalDateTime.now().format(formatter) + " GMT+3"
-        playersExt.players.filter { it.id.equals("659ffb594e9ddccd0928f4ac") }.forEachIndexed { index, player ->
+        playersExt.players.forEachIndexed { index, player ->
             val telegraphUrl = httpClient.post("https://api.telegra.ph/editPage/HPG4-Player-${index + 1}-03-02") {
                 timeout {
                     requestTimeoutMillis = 60000
