@@ -35,6 +35,8 @@ import model.telegraph.RootPage
 import model.telegraph.TelegraphMapper
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import java.io.File
+import java.text.DecimalFormat
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.*
@@ -61,7 +63,7 @@ var trophies: Trophies = Trophies(listOf())
 var bases: Bases = Bases(listOf())
 var lastUpdated = ""
 var trophiesUrl = ""
-var mapUrl = "https://telegra.ph/Karta-03-03-2"
+var mapUrl = "https://telegra.ph/HPG4-Map-03-04"
 
 data class PlayerExtended(
     val player: Player,
@@ -70,7 +72,7 @@ data class PlayerExtended(
     val effectsUrl: String,
     val logGamesUrl: String,
     val logActionsUrl: String
-) {}
+)
 
 val twitchClient: TwitchClient = TwitchClientBuilder.builder()
     .withEnableChat(true)
@@ -233,6 +235,7 @@ fun main(args: Array<String>) {
     Timer().scheduleAtFixedRate(object : TimerTask() {
         override fun run() {
             runBlocking {
+                refreshMapTask()
                 fetchData()
             }
         }
@@ -275,7 +278,7 @@ suspend fun fetchData() {
         playersExt = Gson().fromJson(response, Players::class.java)
         bases = Gson().fromJson(response, Bases::class.java)
         val localLastUpdated = LocalDateTime.now().format(formatter) + " GMT+3"
-        playersExt.players.forEachIndexed { index, player ->
+        playersExt.players.filter { it.id.equals("659ffb594e9ddccd0928f4ac") }.forEachIndexed { index, player ->
             val telegraphUrl = httpClient.post("https://api.telegra.ph/editPage/HPG4-Player-${index + 1}-03-02") {
                 timeout {
                     requestTimeoutMillis = 60000
@@ -368,6 +371,26 @@ suspend fun fetchData() {
                 )
             )
         }.body<Root>().result.url
+        try{
+            val mapImageUrl = File("map_imgur.txt").readText()
+            val mapUpdateTime = File("map_update_time.txt").readText()
+            httpClient.post("https://api.telegra.ph/editPage/HPG4-Map-03-04") {
+                timeout {
+                    requestTimeoutMillis = 60000
+                }
+                contentType(ContentType.Application.Json)
+                setBody(
+                    RootPage(
+                        telegraphMapper.mapHpgMapImageToTelegraph(mapImageUrl, mapUpdateTime),
+                        telegraphApikey,
+                        "Карта",
+                        returnContent = false
+                    )
+                )
+            }.body<Root>()
+        } catch (e: Throwable) {
+            logger.error("Failed edit map page: ", e)
+        }
         lastUpdated = localLastUpdated
     } catch (e: Throwable) {
         try {
@@ -490,7 +513,7 @@ fun getPlayerInfo(nick: String): String {
     val player = playersExtended.firstOrNull { it.player.name.lowercase().trim().equals(nick.lowercase().trim()) }
         ?: return "Игрок под ником $nick не найден Sadge"
     return """${player.player.name} Ур.${player.player.level.current}${player.player.experience} Статус: ${player.player.states.main.mainStateFormatted}
-Доход в день:💰${player.player.dailyIncome.removeSuffix(".0")} На руках:💰${player.player.money.removeSuffix(".0")}
+Доход в день:💰${DecimalFormat("# ##0.00").format(player.player.dailyIncome)} На руках:💰${DecimalFormat("# ##0.00").format(player.player.money)}
 Жетоны конгресса:🗣${player.player.congressTokens}
 Интерес полиции:👮${player.player.policeInterest.current}/${player.player.policeInterest.maximum}
 Мораль:🔱${player.player.morale.current}/${player.player.morale.maximum}
@@ -519,6 +542,18 @@ fun refreshTokensTask() {
         logger.info("refreshTokensTask process called")
     } catch (e: Throwable) {
         logger.error("Failed call restart script:", e)
+    }
+}
+
+fun refreshMapTask() {
+    logger.info("refreshMapTask start")
+    val processBuilder = ProcessBuilder()
+    processBuilder.command("bash", "-c", "cd /home/bot/hpg4_bot/ && . refresh_map.sh")
+    try {
+        processBuilder.start()
+        logger.info("refreshMapTask process called")
+    } catch (e: Throwable) {
+        logger.error("Failed call refresh map script:", e)
     }
 }
 

@@ -5,7 +5,6 @@ import kotlinx.serialization.json.encodeToJsonElement
 import model.hpg.Bases
 import model.hpg.Player
 import model.hpg.Trophies
-import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
@@ -363,7 +362,7 @@ class TelegraphMapper {
         content.add(
             Content(
                 tag = "a",
-                attrs = Attrs(href = "https://telegra.ph/Karta-03-03-2"),
+                attrs = Attrs(href = "https://telegra.ph/HPG4-Map-03-04"),
                 children = Json.encodeToJsonElement(listOf("Карта")),
             )
         )
@@ -664,13 +663,31 @@ class TelegraphMapper {
                     )
                 )
             )
-            if (!gameLog.game.image.isNullOrEmpty())
+            if (!gameLog.game.image.isNullOrEmpty()
+                && !gameLog.game.image.contains("/img/gog/")
+                && gameLog.game.image.startsWith("http")
+            ) {
                 content.add(
                     Content(
                         tag = "img",
                         attrs = Attrs(
                             src = gameLog.game.image
                         ),
+                    )
+                )
+            }
+            var dateTimeText = ""
+            try {
+                dateTimeText = "Запись создана: ${
+                    LocalDateTime.parse(gameLog.createdAt, apiFormat).format(botFormat)
+                }, обновлена: ${LocalDateTime.parse(gameLog.updatedAt, apiFormat).format(botFormat)}"
+            } catch (_: Throwable) {
+            }
+            if (dateTimeText.isNotEmpty())
+                content.add(
+                    Content(
+                        tag = "blockquote",
+                        children = Json.encodeToJsonElement(listOf(dateTimeText))
                     )
                 )
             content.add(
@@ -718,20 +735,49 @@ class TelegraphMapper {
         )
         //ActionLogs
         for (actionLog in player.logs.take(50)) {
-            var dateTime = actionLog.text
+            var dateTimeText = actionLog.text
             try {
-                dateTime = "${LocalDateTime.parse(actionLog.updatedAt, apiFormat).format(botFormat)} ${actionLog.text}"
+                dateTimeText =
+                    "${LocalDateTime.parse(actionLog.updatedAt, apiFormat).format(botFormat)} ${actionLog.text}"
             } catch (_: Throwable) {
             }
             content.add(
                 Content(
                     tag = "blockquote",
                     children = Json.encodeToJsonElement(
-                        listOf(dateTime)
+                        listOf(dateTimeText)
                     )
                 )
             )
         }
+        return content
+    }
+
+    fun mapHpgMapImageToTelegraph(mapUrl: String, localLastUpdated: String): List<Content> {
+        val content: MutableList<Content> = mutableListOf()
+        content.add(
+            Content(
+                tag = "pre",
+                children = Json.encodeToJsonElement(listOf("Обновлено: $localLastUpdated"))
+            )
+        )
+        //HpgMap
+        content.add(
+            Content(
+                tag = "img",
+                attrs = Attrs(
+                    src = "https://i.imgur.com/10kR6al.png"
+                ),
+            )
+        )
+        content.add(
+            Content(
+                tag = "img",
+                attrs = Attrs(
+                    src = mapUrl
+                ),
+            )
+        )
         return content
     }
 }

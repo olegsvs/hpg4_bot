@@ -13,8 +13,8 @@ data class Player(
     val name: String,
     val avatar: Avatar,
     val level: Level,
-    val dailyIncome: String,
-    val money: String,
+    val dailyIncome: Double,
+    val money: Double,
     val hp: HitPoints,
     val effects: List<Effect> = listOf(),
     val policeInterest: PoliceInterest,
@@ -50,6 +50,7 @@ data class ActionLog(
 @Serializable
 data class GameLog(
     val status: String,
+    val createdAt: String,
     val updatedAt: String,
     val review: String?,
     val game: LogGame
