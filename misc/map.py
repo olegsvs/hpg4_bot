@@ -10,6 +10,7 @@ import pyimgur
 import os
 from dotenv import load_dotenv
 from datetime import datetime
+from PIL import Image
 
 
 load_dotenv()
@@ -48,11 +49,16 @@ driver.execute_script(js_script, banner)
 screenshot_area = driver.find_element(By.XPATH, '/html/body/div[1]/div[2]/div[2]/div/div/canvas')
 with open(image, 'wb') as f:
     f.write(screenshot_area.screenshot_as_png)
-im = pyimgur.Imgur(IMGUR_ID)
-uploaded_image = im.upload_image(image, title='hpg4_map').link
-print(uploaded_image)
-with open('map_imgur.txt', 'w') as f:
-    f.write(uploaded_image)
+c_image = Image.open(image)
+width, height = c_image.size
+new_size = (width//2, height//2)
+resized_image = c_image.resize(new_size)
+resized_image.save(image, optimize=False)
+#im = pyimgur.Imgur(IMGUR_ID)
+#uploaded_image = im.upload_image(image, title='hpg4_map').link
+#print(uploaded_image)
+#with open('map_imgur.txt', 'w') as f:
+#    f.write(uploaded_image)
 
 
 #image="hpg4_map_header.png"

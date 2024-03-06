@@ -4,6 +4,11 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
+typealias UploadResponse = List<UploadedFile>;
+@Serializable
+data class UploadedFile(
+    val src: String,
+)
 @Serializable
 data class Root(
     val ok: Boolean,

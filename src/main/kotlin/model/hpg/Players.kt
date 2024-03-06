@@ -203,7 +203,7 @@ data class DailyActions(
     val maximum: Int,
 ) {
     override fun toString(): String {
-        return "ежедневные: $current/$maximum"
+        return "день $current/$maximum"
     }
 }
 
@@ -212,8 +212,12 @@ data class ExploringActions(
     val current: Int,
     val maximum: Int,
 ) {
+    fun toTwitchString(): String {
+        return "Очк.развед. $current/$maximum"
+    }
+
     override fun toString(): String {
-        return "Изучение: $current/$maximum"
+        return "Очки разведки $current/$maximum"
     }
 }
 
@@ -223,7 +227,11 @@ data class MovementActions(
     val maximum: Int,
 ) {
     override fun toString(): String {
-        return "Передвижение: $current/$maximum"
+        return "Очки движения $current/$maximum"
+    }
+
+    fun toTwitchString(): String {
+        return "Очк.движ. $current/$maximum"
     }
 }
 
@@ -233,7 +241,11 @@ data class WeeklyActions(
     val maximum: Int,
 ) {
     override fun toString(): String {
-        return "еженедельные: $current/$maximum"
+        return "Неделя $current/$maximum"
+    }
+
+    fun toTwitchString(): String {
+        return "нед. $current/$maximum"
     }
 }
 
@@ -243,7 +255,11 @@ data class TurnsActions(
     val daily: DailyActions,
 ) {
     override fun toString(): String {
-        return "Повороты: $daily, $weekly"
+        return "Ходы ${daily}, $weekly"
+    }
+
+    fun toTwitchString(): String {
+        return "Ходы ${daily}, ${weekly.toString().lowercase()}"
     }
 }
 
@@ -373,7 +389,7 @@ data class Skill(
             else -> type
         }
     override fun toString(): String {
-        return "$name\n$lore\nОписание: $description\nТип: $typeFormatted\nКд: $cooldown\n"
+        return "$lore\nОписание: $description\nТип: $typeFormatted\nКд: $cooldown\n"
     }
 }
 
@@ -412,7 +428,7 @@ class FamilyData(
             }
         }
     override fun toString(): String {
-        return "${descriptionString}Тир: $tier\nБоевая мощь: $combatPower\nСкиллы: ${skillsString}"
+        return "${descriptionString}Тир: $tier\nБоевая мощь: $combatPower\n"
     }
 }
 

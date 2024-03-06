@@ -616,12 +616,51 @@ class TelegraphMapper {
                         )
                     )
                 )
-            content.add(
-                Content(
-                    tag = "blockquote",
-                    children = Json.encodeToJsonElement(listOf(member.data.toString()))
+            if(member.data.skills.isNullOrEmpty()) {
+                content.add(
+                    Content(
+                        tag = "blockquote",
+                        children = Json.encodeToJsonElement(listOf(member.data.toString() + "Скиллы: -"))
+                    )
                 )
-            )
+            } else {
+                content.add(
+                    Content(
+                        tag = "blockquote",
+                        children = Json.encodeToJsonElement(listOf(member.data.toString()))
+                    )
+                )
+                for(skill in member.data.skills) {
+                    content.add(
+                        Content(
+                            tag = "blockquote",
+                            children = Json.encodeToJsonElement(listOf(Content(
+                                tag = "a",
+                                children = Json.encodeToJsonElement(listOf(
+                                    Content(
+                                        tag = "a",
+                                        children = Json.encodeToJsonElement(listOf("Скиллы:\n"))
+                                    ),
+                                    Content(
+                                        tag = "strong",
+                                        children = Json.encodeToJsonElement(listOf(skill.name + "\n"))
+                                    ),
+                                    Content(
+                                        tag = "a",
+                                        children = Json.encodeToJsonElement(listOf(skill.toString()))
+                                    )))
+                            )))
+                        )
+                    )
+                    /*content.add(
+                        Content(
+                            tag = "blockquote",
+                            children = Json.encodeToJsonElement(listOf(skill.toString()))
+                        )
+                    )*/
+                }
+            }
+
         }
         return content
     }
