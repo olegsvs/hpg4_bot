@@ -496,8 +496,18 @@ fun twitchHpgInfoCommand(event: ChannelMessageEvent, commandText: String, nick: 
                     "КД \uD83D\uDD5B ${nextRollMinutes}м${nextRollSeconds}с"
                 )
                 return
+            } else {
+                coolDowns.remove(cd)
             }
         }
+        coolDowns.add(
+            CoolDown(
+                channelName = event.channel!!.name,
+                commandText = commandText,
+                coolDownMillis = twitchCommandsCoolDownInMillis,
+                lastUsageInMillis = System.currentTimeMillis()
+            )
+        )
         if (!nick.isNullOrEmpty()) {
             val infoMessage = "ОБН $lastTimeUpdated ${getPlayerTwitchInfo(nick)}${getPlayerTphUrl(nick)}"
             infoMessage.chunked(499).map {
@@ -514,14 +524,7 @@ fun twitchHpgInfoCommand(event: ChannelMessageEvent, commandText: String, nick: 
                 event.reply(twitchClient.chat, it)
             }
         }
-        coolDowns.add(
-            CoolDown(
-                channelName = event.channel!!.name,
-                commandText = commandText,
-                coolDownMillis = twitchCommandsCoolDownInMillis,
-                lastUsageInMillis = System.currentTimeMillis()
-            )
-        )
+
     } catch (e: Throwable) {
         logger.error("Failed twitch hpg_info command: ", e)
     }
@@ -545,16 +548,9 @@ fun twitchHpgGamesCommand(event: ChannelMessageEvent, commandText: String) {
                     "КД \uD83D\uDD5B ${nextRollMinutes}м${nextRollSeconds}с"
                 )
                 return
+            } else {
+                coolDowns.remove(cd)
             }
-        }
-        val shortSummary = playersExt.players.map {
-            "@${it.name} \uD83C\uDFAE${it.currentGameTwitch}"
-        }
-        val infoMessage = "ОБН $lastTimeUpdated " + shortSummary.toString()
-            .removeSuffix("]")
-            .removePrefix("[") + " Подробнее !hpg_info nick"
-        infoMessage.chunked(499).map {
-            event.reply(twitchClient.chat, it)
         }
         coolDowns.add(
             CoolDown(
@@ -564,6 +560,15 @@ fun twitchHpgGamesCommand(event: ChannelMessageEvent, commandText: String) {
                 lastUsageInMillis = System.currentTimeMillis()
             )
         )
+        val shortSummary = playersExt.players.map {
+            "@${it.name} \uD83C\uDFAE${it.currentGameTwitch}"
+        }
+        val infoMessage = "ОБН $lastTimeUpdated " + shortSummary.toString()
+            .removeSuffix("]")
+            .removePrefix("[") + " Подробнее !hpg_info nick"
+        infoMessage.chunked(499).map {
+            event.reply(twitchClient.chat, it)
+        }
     } catch (e: Throwable) {
         logger.error("Failed twitch hpg_info command: ", e)
     }

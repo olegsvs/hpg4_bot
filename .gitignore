@@ -2,6 +2,10 @@
 # Created by https://www.gitignore.io/api/osx,java,linux,kotlin,windows,eclipse,java-web,intellij+all,visualstudiocode,gradle,maven
 # Edit at https://www.gitignore.io/?templates=osx,java,linux,kotlin,windows,eclipse,java-web,intellij+all,visualstudiocode,gradle,maven
 
+# HPG
+hpg4_map.png
+map_update_time.txt
+
 ### Eclipse ###
 .metadata
 bin/
