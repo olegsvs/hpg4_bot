@@ -509,7 +509,7 @@ fun twitchHpgInfoCommand(event: ChannelMessageEvent, commandText: String, nick: 
             )
         )
         if (!nick.isNullOrEmpty()) {
-            val infoMessage = "ОБН $lastTimeUpdated ${getPlayerTwitchInfo(nick)}${getPlayerTphUrl(nick)}"
+            val infoMessage = "Upd.$lastTimeUpdated ${getPlayerTwitchInfo(nick)}${getPlayerTphUrl(nick)}"
             infoMessage.chunked(499).map {
                 event.reply(twitchClient.chat, it)
             }
@@ -517,7 +517,7 @@ fun twitchHpgInfoCommand(event: ChannelMessageEvent, commandText: String, nick: 
             val shortSummary = playersExt.players.map {
                 "@${it.name} \uD83D\uDC40 Ходы ${it.actionPoints.turns.daily}"
             }
-            val infoMessage = "ОБН $lastTimeUpdated " + shortSummary.toString()
+            val infoMessage = "Upd.$lastTimeUpdated " + shortSummary.toString()
                 .removeSuffix("]")
                 .removePrefix("[") + " Подробнее !hpg_info nick Текущие игры !hpg_games"
             infoMessage.chunked(499).map {
@@ -563,7 +563,7 @@ fun twitchHpgGamesCommand(event: ChannelMessageEvent, commandText: String) {
         val shortSummary = playersExt.players.map {
             "@${it.name} \uD83C\uDFAE${it.currentGameTwitch}"
         }
-        val infoMessage = "ОБН $lastTimeUpdated " + shortSummary.toString()
+        val infoMessage = "Upd.$lastTimeUpdated " + shortSummary.toString()
             .removeSuffix("]")
             .removePrefix("[") + " Подробнее !hpg_info nick"
         infoMessage.chunked(499).map {

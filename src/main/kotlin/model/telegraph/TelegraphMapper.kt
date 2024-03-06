@@ -522,49 +522,51 @@ class TelegraphMapper {
             )
         )
         val base = bases.map.filter { it.sector.type == "BASE" }
-            .first { it.sector.data.dynamicData?.controlledBy.equals(player.id) }.sector.data.dynamicData!!.structures
-        content.add(
-            Content(
-                tag = "blockquote",
-                children = Json.encodeToJsonElement(listOf("${base.arsenal.name}, уровень: ${base.arsenal.level}\n")),
+            .firstOrNull { it.sector.data.dynamicData?.controlledBy.equals(player.id) }?.sector?.data?.dynamicData?.structures
+        if(base != null) {
+            content.add(
+                Content(
+                    tag = "blockquote",
+                    children = Json.encodeToJsonElement(listOf("${base.arsenal.name}, уровень: ${base.arsenal.level}\n")),
+                )
             )
-        )
-        content.add(
-            Content(
-                tag = "blockquote",
-                children = Json.encodeToJsonElement(listOf("${base.familyClub.name}, уровень: ${base.familyClub.level}\n")),
+            content.add(
+                Content(
+                    tag = "blockquote",
+                    children = Json.encodeToJsonElement(listOf("${base.familyClub.name}, уровень: ${base.familyClub.level}\n")),
+                )
             )
-        )
-        content.add(
-            Content(
-                tag = "blockquote",
-                children = Json.encodeToJsonElement(listOf("${base.garage.name}, уровень: ${base.garage.level}\n")),
+            content.add(
+                Content(
+                    tag = "blockquote",
+                    children = Json.encodeToJsonElement(listOf("${base.garage.name}, уровень: ${base.garage.level}\n")),
+                )
             )
-        )
-        content.add(
-            Content(
-                tag = "blockquote",
-                children = Json.encodeToJsonElement(listOf("${base.stock.name}, уровень: ${base.stock.level}\n")),
+            content.add(
+                Content(
+                    tag = "blockquote",
+                    children = Json.encodeToJsonElement(listOf("${base.stock.name}, уровень: ${base.stock.level}\n")),
+                )
             )
-        )
-        content.add(
-            Content(
-                tag = "blockquote",
-                children = Json.encodeToJsonElement(listOf("${base.pub.name}, уровень: ${base.pub.level}\n")),
+            content.add(
+                Content(
+                    tag = "blockquote",
+                    children = Json.encodeToJsonElement(listOf("${base.pub.name}, уровень: ${base.pub.level}\n")),
+                )
             )
-        )
-        content.add(
-            Content(
-                tag = "blockquote",
-                children = Json.encodeToJsonElement(listOf("${base.headquarter.name}, уровень: ${base.headquarter.level}\n")),
+            content.add(
+                Content(
+                    tag = "blockquote",
+                    children = Json.encodeToJsonElement(listOf("${base.headquarter.name}, уровень: ${base.headquarter.level}\n")),
+                )
             )
-        )
-        content.add(
-            Content(
-                tag = "blockquote",
-                children = Json.encodeToJsonElement(listOf("${base.gamblingClub.name}, уровень: ${base.gamblingClub.level}\n")),
+            content.add(
+                Content(
+                    tag = "blockquote",
+                    children = Json.encodeToJsonElement(listOf("${base.gamblingClub.name}, уровень: ${base.gamblingClub.level}\n")),
+                )
             )
-        )
+        }
         //Family
         content.add(
             Content(
