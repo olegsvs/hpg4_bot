@@ -327,7 +327,7 @@ class TelegraphMapper {
         return content
     }
 
-    fun mapPlayerToTelegraph(player: Player, index: Int, bases: Bases, localLastUpdated: String): List<Content> {
+    fun mapPlayerToTelegraph(player: Player, index: Int, bases: Bases, mapUrl: String, localLastUpdated: String): List<Content> {
         val content: MutableList<Content> = mutableListOf()
         content.add(
             Content(
@@ -362,7 +362,7 @@ class TelegraphMapper {
         content.add(
             Content(
                 tag = "a",
-                attrs = Attrs(href = "https://telegra.ph/HPG4-Map-03-04"),
+                attrs = Attrs(href = mapUrl),
                 children = Json.encodeToJsonElement(listOf("Карта")),
             )
         )

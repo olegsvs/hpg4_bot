@@ -39,6 +39,26 @@ data class Player(
         get() = effects.filter { it.type == "negative" }
     val otherEffects: List<Effect>
         get() = effects.filter { it.type == "neutral" }
+
+    val currentGameTwitch: String
+        get() {
+            val gameLog = gameLogs.firstOrNull()
+            if(gameLog == null) {
+                return "-"
+            } else {
+                return "${gameLog.game.name} ${gameLog.statusFormatted}"
+            }
+        }
+
+    val currentGameTg: String
+        get() {
+            val gameLog = gameLogs.firstOrNull()
+            if(gameLog == null) {
+                return "-"
+            } else {
+                return """<a href="${gameLog.game.link}"><b>${gameLog.game.name}</b></a> <b>${gameLog.statusFormatted}</b>"""
+            }
+        }
 }
 
 @Serializable
@@ -55,15 +75,15 @@ data class GameLog(
     val review: String?,
     val game: LogGame
 ) {
-val statusFormatted: String
-    get() = when (status.lowercase()) {
-        "completed" -> "✅ Пройдена"
-        "rerolled" -> "\uD83D\uDD04 Реролл"
-        "dropped" -> "❌ Дроп"
-        "freedropped" -> "❎ Дроп без последствий"
-        "playing" -> "\uD83D\uDE80 В процессе"
-        else -> status
-    }
+    val statusFormatted: String
+        get() = when (status.lowercase()) {
+            "completed" -> "✅ Пройдена"
+            "rerolled" -> "\uD83D\uDD04 Реролл"
+            "dropped" -> "❌ Дроп"
+            "freedropped" -> "❎ Дроп без последствий"
+            "playing" -> "\uD83D\uDE80 В процессе"
+            else -> status
+        }
 }
 
 @Serializable
@@ -161,15 +181,15 @@ data class Slots(
     val chain: Item?,
     val legs: Item?,
 ) {
-    fun getListItem(items: List<Item?>?) : String {
-        return if(items.isNullOrEmpty()) "Пусто"
+    fun getListItem(items: List<Item?>?): String {
+        return if (items.isNullOrEmpty()) "Пусто"
         else {
             var res = ""
-            for(item in items) {
-                if(item ==null) continue
-                res +=item.name + ", "
+            for (item in items) {
+                if (item == null) continue
+                res += item.name + ", "
             }
-            if(res.isEmpty()) {
+            if (res.isEmpty()) {
                 "Пусто"
             } else {
                 res.removeSuffix(", ")
@@ -177,10 +197,10 @@ data class Slots(
         }
     }
 
-    fun getItem(item: Item?) : String {
-        return if(item == null) "Пусто"
+    fun getItem(item: Item?): String {
+        return if (item == null) "Пусто"
         else {
-            item.name?:"Пусто"
+            item.name ?: "Пусто"
         }
     }
 }
@@ -356,7 +376,7 @@ data class Practicality(
     val mates: Int,
     val summary: Int,
     val actual: Int,
-){
+) {
     val name: String
         get() = "Практичность"
 }
@@ -369,7 +389,7 @@ data class Organization(
     val mates: Int,
     val summary: Int,
     val actual: Int,
-){
+) {
     val name: String
         get() = "Организованность"
 }
@@ -388,6 +408,7 @@ data class Skill(
             "active" -> "Активный"
             else -> type
         }
+
     override fun toString(): String {
         return "$lore\nОписание: $description\nТип: $typeFormatted\nКд: $cooldown\n"
     }
@@ -402,31 +423,32 @@ class FamilyMember(
 class FamilyData(
     val name: String,
     val description: String?,
-    val skills:  List<Skill>? = listOf(),
+    val skills: List<Skill>? = listOf(),
     val combatPower: Int,
     val tier: Int,
     val image: String?,
 ) {
     val skillsString: String
-    get() {
-        return if(skills.isNullOrEmpty()) {
-            "Нету"
-        } else {
-            var result = "\n"
-            for(skill in skills) {
-                result += skill.toString() + "\n"
+        get() {
+            return if (skills.isNullOrEmpty()) {
+                "Нету"
+            } else {
+                var result = "\n"
+                for (skill in skills) {
+                    result += skill.toString() + "\n"
+                }
+                return result
             }
-            return result
         }
-    }
     val descriptionString: String
         get() {
-            return if(description.isNullOrEmpty()) {
+            return if (description.isNullOrEmpty()) {
                 ""
             } else {
-                description+"\n"
+                description + "\n"
             }
         }
+
     override fun toString(): String {
         return "${descriptionString}Тир: $tier\nБоевая мощь: $combatPower\n"
     }

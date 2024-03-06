@@ -289,13 +289,18 @@ fun main(args: Array<String>) {
                 if (event.message.removePrefix("!hpg_info ").trim().isEmpty()) {
                     twitchHpgInfoCommand(event, "!hpg_info")
                 } else {
-                    val nick = event.message.removePrefix("!hpg_info ").replace("\uDB40\uDC00", "").trim()
+                    val nick = event.message.removePrefix("!hpg_info ").replace("\uDB40\uDC00", "").replace("@", "").trim()
                     twitchHpgInfoCommand(
                         event,
                         commandText = "!hpg_info$nick",
                         nick
                     )
                 }
+            }
+        }
+        if (event.message.equals("!hpg_games")) {
+            GlobalScope.launch {
+                twitchHpgGamesCommand(event, "!hpg_games")
             }
         }
         if (event.message.startsWith("!hping")) {
@@ -326,7 +331,7 @@ suspend fun fetchData() {
                     contentType(ContentType.Application.Json)
                     setBody(
                         RootPage(
-                            telegraphMapper.mapPlayerToTelegraph(player, index, bases, localLastUpdated),
+                            telegraphMapper.mapPlayerToTelegraph(player, index, bases, mapUrl, localLastUpdated),
                             telegraphApikey,
                             "Инфо ${player.name}",
                             returnContent = false
@@ -492,30 +497,73 @@ fun twitchHpgInfoCommand(event: ChannelMessageEvent, commandText: String, nick: 
                 )
                 return
             }
-        } else {
-            coolDowns.add(
-                CoolDown(
-                    channelName = event.channel!!.name,
-                    commandText = commandText,
-                    coolDownMillis = twitchCommandsCoolDownInMillis,
-                    lastUsageInMillis = System.currentTimeMillis()
-                )
-            )
         }
         if (!nick.isNullOrEmpty()) {
-            event.reply(twitchClient.chat, "UPD $lastTimeUpdated ${getPlayerTwitchInfo(nick)}${getPlayerTphUrl(nick)}")
+            val infoMessage = "ОБН $lastTimeUpdated ${getPlayerTwitchInfo(nick)}${getPlayerTphUrl(nick)}"
+            infoMessage.chunked(499).map {
+                event.reply(twitchClient.chat, it)
+            }
         } else {
             val shortSummary = playersExt.players.map {
                 "@${it.name} \uD83D\uDC40 Ходы ${it.actionPoints.turns.daily}"
             }
-            event.reply(
-                twitchClient.chat,
-                "UPD $lastTimeUpdated " + shortSummary.toString()
-                    .removeSuffix("]")
-                    .removePrefix("[") + " Подробнее !hpg_info nick"
-            )
-
+            val infoMessage = "ОБН $lastTimeUpdated " + shortSummary.toString()
+                .removeSuffix("]")
+                .removePrefix("[") + " Подробнее !hpg_info nick Текущие игры !hpg_games"
+            infoMessage.chunked(499).map {
+                event.reply(twitchClient.chat, it)
+            }
         }
+        coolDowns.add(
+            CoolDown(
+                channelName = event.channel!!.name,
+                commandText = commandText,
+                coolDownMillis = twitchCommandsCoolDownInMillis,
+                lastUsageInMillis = System.currentTimeMillis()
+            )
+        )
+    } catch (e: Throwable) {
+        logger.error("Failed twitch hpg_info command: ", e)
+    }
+}
+
+fun twitchHpgGamesCommand(event: ChannelMessageEvent, commandText: String) {
+    try {
+        logger.info("twitch, hpg_games, message: ${event.message} user: ${event.user.name}")
+        logger.info(coolDowns.toString())
+        val cd = coolDowns.firstOrNull { it.channelName == event.channel!!.name && it.commandText == commandText }
+        if (cd != null) {
+            val now = System.currentTimeMillis() / 1000
+            val cdInSeconds = (cd.coolDownMillis / 1000)
+            val diff = (now - cd.lastUsageInMillis / 1000)
+            if (diff < cdInSeconds) {
+                val nextRollTime = (cdInSeconds - diff)
+                val nextRollMinutes = (nextRollTime % 3600) / 60
+                val nextRollSeconds = (nextRollTime % 3600) % 60
+                event.reply(
+                    twitchClient.chat,
+                    "КД \uD83D\uDD5B ${nextRollMinutes}м${nextRollSeconds}с"
+                )
+                return
+            }
+        }
+        val shortSummary = playersExt.players.map {
+            "@${it.name} \uD83C\uDFAE${it.currentGameTwitch}"
+        }
+        val infoMessage = "ОБН $lastTimeUpdated " + shortSummary.toString()
+            .removeSuffix("]")
+            .removePrefix("[") + " Подробнее !hpg_info nick"
+        infoMessage.chunked(499).map {
+            event.reply(twitchClient.chat, it)
+        }
+        coolDowns.add(
+            CoolDown(
+                channelName = event.channel!!.name,
+                commandText = commandText,
+                coolDownMillis = twitchCommandsCoolDownInMillis,
+                lastUsageInMillis = System.currentTimeMillis()
+            )
+        )
     } catch (e: Throwable) {
         logger.error("Failed twitch hpg_info command: ", e)
     }
@@ -567,7 +615,7 @@ suspend fun tgHpgInfoCommand(initialMessage: Message) {
         val shortSummary = playersExt.players.map {
             ("\uD83D\uDC49 <a href=\"https://www.twitch.tv/${it.name}\"><b>${it.name} \uD83D\uDC7E</b></a> \uD83D\uDC40 Ур. <b>" +
                     "${it.level.current}${it.experience}</b> \uD83E\uDEF1 Ходы день <b>${it.actionPoints.turns.daily.current}/" +
-                    "${it.actionPoints.turns.daily.maximum}</b>\n").replace(
+                    "${it.actionPoints.turns.daily.maximum}</b>\n\uD83C\uDFAEИгра ${it.currentGameTg}\n").replace(
                 " , ", ""
             )
         }
@@ -605,39 +653,41 @@ private fun isPrivateMessage(message: Message): Boolean {
 }
 
 fun getPlayerTgInfo(nick: String): String {
-    val player = playersExtended.firstOrNull { it.player.name.lowercase().trim().equals(nick.lowercase().trim()) }
+    val playerExt = playersExtended.firstOrNull { it.player.name.lowercase().trim().equals(nick.lowercase().trim()) }
         ?: return "Игрок под ником <b>$nick</b> не найден Sadge"
-    return """👉<a href="https://www.twitch.tv/${player.player.name}"><b>${player.player.name} 👾</b></a> Уровень <b>${player.player.level.current}${player.player.experience}</b>
-⭐Ходы день <b>${player.player.actionPoints.turns.daily.current}/${player.player.actionPoints.turns.daily.maximum}</b>, неделя <b>${player.player.actionPoints.turns.weekly.current}/${player.player.actionPoints.turns.weekly.maximum}</b>
-⭐Очки движения <b>${player.player.actionPoints.movement.current}/${player.player.actionPoints.movement.maximum}</b>
-⭐Очки разведки <b>${player.player.actionPoints.exploring.current}/${player.player.actionPoints.exploring.maximum}</b>
-💰Доход в день <b>${DecimalFormat("# ##0.00").format(player.player.dailyIncome)}</b> На руках💰<b>${
+    return """👉<a href="https://www.twitch.tv/${playerExt.player.name}"><b>${playerExt.player.name} 👾</b></a> Уровень <b>${playerExt.player.level.current}${playerExt.player.experience}</b>
+🎮Текущая игра ${playerExt.player.currentGameTg}
+⭐Ходы день <b>${playerExt.player.actionPoints.turns.daily.current}/${playerExt.player.actionPoints.turns.daily.maximum}</b>, неделя <b>${playerExt.player.actionPoints.turns.weekly.current}/${playerExt.player.actionPoints.turns.weekly.maximum}</b>
+⭐Очки движения <b>${playerExt.player.actionPoints.movement.current}/${playerExt.player.actionPoints.movement.maximum}</b>
+⭐Очки разведки <b>${playerExt.player.actionPoints.exploring.current}/${playerExt.player.actionPoints.exploring.maximum}</b>
+💰Доход в день <b>${DecimalFormat("# ##0.00").format(playerExt.player.dailyIncome)}</b> На руках💰<b>${
         DecimalFormat("# ##0.00").format(
-            player.player.money
+            playerExt.player.money
         )
     }</b>
-🗣Жетоны съезда <b>${player.player.congressTokens}</b>
-👮Интерес полиции <b>${player.player.policeInterest.current}/${player.player.policeInterest.maximum}</b>
-🔱Мораль семьи <b>${player.player.morale.current}/${player.player.morale.maximum}</b>
-❔Эффектов 😊<b>${player.player.positiveEffects.size}</b>😐<b>${player.player.negativeEffects.size}</b>😤<b>${player.player.otherEffects.size}</b>
-❤HP <b>${player.player.hp.current}/${player.player.hp.maximum}</b>
-💪Боевая мощь <b>${player.player.combatPower.current}/${player.player.combatPower.maximum}</b>
+🗣Жетоны съезда <b>${playerExt.player.congressTokens}</b>
+👮Интерес полиции <b>${playerExt.player.policeInterest.current}/${playerExt.player.policeInterest.maximum}</b>
+🔱Мораль семьи <b>${playerExt.player.morale.current}/${playerExt.player.morale.maximum}</b>
+❔Эффектов 😊<b>${playerExt.player.positiveEffects.size}</b>😐<b>${playerExt.player.negativeEffects.size}</b>😤<b>${playerExt.player.otherEffects.size}</b>
+❤HP <b>${playerExt.player.hp.current}/${playerExt.player.hp.maximum}</b>
+💪Боевая мощь <b>${playerExt.player.combatPower.current}/${playerExt.player.combatPower.maximum}</b>
         """.trimIndent()
 }
 
 fun getPlayerTwitchInfo(nick: String): String {
-    val player = playersExtended.firstOrNull { it.player.name.lowercase().trim().equals(nick.lowercase().trim()) }
+    val playerExt = playersExtended.firstOrNull { it.player.name.lowercase().trim().equals(nick.lowercase().trim()) }
         ?: return "Игрок под ником $nick не найден Sadge"
-    return """👉@${player.player.name} Ур.${player.player.level.current}${player.player.experience}
-⭐${player.player.actionPoints.turns} ${player.player.actionPoints.movement.toTwitchString()} ${player.player.actionPoints.exploring.toTwitchString()}
-Доход ${DecimalFormat("# ##0").format(player.player.dailyIncome)}
-На руках ${DecimalFormat("# ##0").format(player.player.money)}
-Жетоны съезда ${player.player.congressTokens}
-Интерес полиции ${player.player.policeInterest.current}/${player.player.policeInterest.maximum}
-Мораль семьи ${player.player.morale.current}/${player.player.morale.maximum}
-Эффектов 😊${player.player.positiveEffects.size}😐${player.player.negativeEffects.size}😤${player.player.otherEffects.size}
-HP ${player.player.hp.current}/${player.player.hp.maximum}
-Боевая мощь ${player.player.combatPower.current}/${player.player.combatPower.maximum}
+    return """👉@${playerExt.player.name} Ур.${playerExt.player.level.current}${playerExt.player.experience}
+🎮${playerExt.player.currentGameTwitch}
+⭐${playerExt.player.actionPoints.turns} ${playerExt.player.actionPoints.movement.toTwitchString()} ${playerExt.player.actionPoints.exploring.toTwitchString()}
+Доход ${DecimalFormat("# ##0").format(playerExt.player.dailyIncome)}
+На руках ${DecimalFormat("# ##0").format(playerExt.player.money)}
+Жетоны съезда ${playerExt.player.congressTokens}
+Интерес полиции ${playerExt.player.policeInterest.current}/${playerExt.player.policeInterest.maximum}
+Мораль семьи ${playerExt.player.morale.current}/${playerExt.player.morale.maximum}
+Эффектов 😊${playerExt.player.positiveEffects.size}😐${playerExt.player.negativeEffects.size}😤${playerExt.player.otherEffects.size}
+HP ${playerExt.player.hp.current}/${playerExt.player.hp.maximum}
+Боевая мощь ${playerExt.player.combatPower.current}/${playerExt.player.combatPower.maximum}
         """.trimIndent()
 }
 
